@@ -16,19 +16,78 @@ st.set_page_config(
 if "total_tokens" not in st.session_state:
     st.session_state.total_tokens = 0
 
-# Custom CSS
+# Custom CSS for Responsiveness and Modern Look
 st.markdown("""
     <style>
-    .main { background-color: #0e1117; }
-    .stChatMessage { border-radius: 10px; margin-bottom: 10px; }
-    .stJson { background-color: #1e1e1e; padding: 10px; border-radius: 5px; }
+    /* Main Background and Text */
+    .main { 
+        background-color: #0e1117; 
+    }
+    
+    /* Responsive Font Sizes */
+    html {
+        font-size: 16px;
+    }
+    @media (max-width: 768px) {
+        html {
+            font-size: 14px;
+        }
+        .stTitle {
+            font-size: 1.8rem !important;
+        }
+    }
+
+    /* Chat Message Styling */
+    .stChatMessage { 
+        border-radius: 12px; 
+        margin-bottom: 15px;
+        padding: 1rem;
+        border: 1px solid #262730;
+    }
+    
+    /* Improved Json and Code blocks */
+    .stJson, code { 
+        background-color: #1e1e1e !important; 
+        padding: 12px !important; 
+        border-radius: 8px !important; 
+    }
+
+    /* Token Counter - Fully Responsive */
     .token-counter {
-        padding: 10px;
-        border-radius: 5px;
-        background-color: #262730;
+        padding: 15px;
+        border-radius: 10px;
+        background: linear-gradient(145deg, #1e1e1e, #262730);
         border: 1px solid #4b4b4b;
         text-align: center;
         font-weight: bold;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        margin-bottom: 1rem;
+    }
+    
+    .token-value {
+        color: #ff4b4b;
+        font-size: 1.5rem;
+        display: block;
+        margin-top: 5px;
+    }
+
+    /* Sidebar Improvements */
+    [data-testid="stSidebar"] {
+        background-color: #161b22;
+        padding-top: 2rem;
+    }
+    
+    /* Make buttons look better on mobile */
+    .stButton button {
+        width: 100%;
+        border-radius: 8px;
+    }
+    
+    /* Adjusting container for better mobile experience */
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 5rem;
+        max-width: 800px;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -47,8 +106,15 @@ def render_assistant_response(content):
             data = content
 
         explanation = data.get("explanation", "")
+        result = data.get("result")
+        operation = data.get("operation", "Calculation")
+
+        # Highlight the result if it exists
+        if result is not None:
+            st.markdown(f"### 🎯 Result: `{result}`")
+        
         if explanation:
-            st.write(explanation)
+            st.markdown(f"**Explanation:**\n{explanation}")
         
         # Check for plot data
         plot_data = data.get("plot_data")
@@ -60,8 +126,11 @@ def render_assistant_response(content):
             })
             # Ensure x is the index for line_chart
             df_plot = df_plot.set_index("x")
-            st.line_chart(df_plot)
-            st.success(f"📈 Visualized: {data.get('expression', 'Function')}")
+            
+            # Responsive container for chart
+            with st.container():
+                st.line_chart(df_plot, use_container_width=True)
+                st.success(f"📈 Visualized: {data.get('expression', 'Function')}")
 
         with st.expander("🔍 View Technical Details"):
             st.json(data)
@@ -87,19 +156,29 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # Token Counter
+    # Token Counter & Cost in Columns
     st.subheader("📊 Usage Statistics")
-    st.markdown(f"""
-        <div class="token-counter">
-            Total Tokens Used: <br>
-            <span style="color: #ff4b4b; font-size: 20px;">{st.session_state.total_tokens}</span>
-        </div>
-    """, unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
     
     # Cost estimation (rough)
-    # Command R+ cost: ~$3 per 1M input, $15 per 1M output. Simplification: $0.01 per 1000 tokens
     cost = (st.session_state.total_tokens / 1000) * 0.01
-    st.caption(f"Estimated Cost: ${cost:.4f}")
+    
+    with col1:
+        st.markdown(f"""
+            <div class="token-counter">
+                Tokens
+                <span class="token-value" style="font-size: 1.2rem;">{st.session_state.total_tokens}</span>
+            </div>
+        """, unsafe_allow_html=True)
+        
+    with col2:
+        st.markdown(f"""
+            <div class="token-counter">
+                Cost
+                <span class="token-value" style="font-size: 1.2rem;">${cost:.4f}</span>
+            </div>
+        """, unsafe_allow_html=True)
     
     st.markdown("---")
     
@@ -109,16 +188,18 @@ with st.sidebar:
     if memory_data:
         df = pd.DataFrame(memory_data)
         csv = df.to_csv(index=False).encode('utf-8')
-        st.download_button(
+        if st.download_button(
             label="📥 Export Chat History (CSV)",
             data=csv,
             file_name=f"chat_history_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
             mime="text/csv",
-        )
+        ):
+            st.toast("History exported successfully!", icon="✅")
     
-    if st.button("🗑️ Clear Conversation"):
+    if st.button("🗑️ Clear Conversation", use_container_width=True):
         clear_memory()
         st.session_state.total_tokens = 0
+        st.toast("Memory cleared!", icon="🧹")
         st.rerun()
 
     st.markdown("---")
